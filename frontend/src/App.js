@@ -11,6 +11,7 @@ import Register from './pages/auth/Register';
 import CreatorDashboard from './pages/creator/Dashboard';
 import CreatorOnboarding from './pages/creator/Onboarding';
 import CreatorLinks from './pages/creator/Links';
+import CreatorSettings from './pages/creator/Settings';
 
 // Sponsor pages
 import SponsorDashboard from './pages/sponsor/Dashboard';
@@ -44,6 +45,7 @@ function App() {
           <Route path="/creator" element={<CreatorDashboard />} />
           <Route path="/creator/onboarding" element={<CreatorOnboarding />} />
           <Route path="/creator/links" element={<CreatorLinks />} />
+          <Route path="/creator/settings" element={<CreatorSettings />} />
           <Route path="/sponsor" element={<SponsorDashboard />} />
           <Route path="/sponsor/onboarding" element={<SponsorOnboarding />} />
           <Route path="/sponsor/campaigns" element={<Campaigns />} />
