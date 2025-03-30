@@ -36,27 +36,18 @@ router.get('/dashboard', async (req, res) => {
 // Get creator profile
 router.get('/profile', async (req, res) => {
   try {
-    // TODO: Implement actual profile fetching
-    res.json({
-      name: 'Test Creator',
-      email: 'creator@example.com',
-      joinedDate: new Date(),
-    });
+    res.status(200).json({ message: 'Creator profile endpoint' });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching profile' });
+    res.status(500).json({ message: error.message });
   }
 });
 
 // Update creator profile
 router.put('/profile', async (req, res) => {
   try {
-    // TODO: Implement actual profile update
-    res.json({
-      message: 'Profile updated successfully',
-      profile: req.body
-    });
+    res.status(200).json({ message: 'Update profile endpoint' });
   } catch (error) {
-    res.status(500).json({ message: 'Error updating profile' });
+    res.status(500).json({ message: error.message });
   }
 });
 

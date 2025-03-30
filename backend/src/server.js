@@ -15,9 +15,17 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN,
+  credentials: true
+}));
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Test route
+app.get('/', (req, res) => {
+  res.json({ message: 'Revvy API is running!' });
+});
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
