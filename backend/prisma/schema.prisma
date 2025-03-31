@@ -22,6 +22,7 @@ model Link {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  creator   Creator  @relation(fields: [creatorId], references: [id])
 
   @@index([creatorId])
   @@index([slug])
@@ -31,6 +32,8 @@ model Creator {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  links     Link[]
 }

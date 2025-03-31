@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const auth = require('../middleware/auth');
 
 // Generate a random slug
 function generateSlug(length = 6) {
@@ -13,13 +14,14 @@ function generateSlug(length = 6) {
   return result;
 }
 
-// Create a new link
-router.post('/', async (req, res) => {
+// Create a new link (protected)
+router.post('/', auth, async (req, res) => {
   try {
-    const { targetUrl, creatorId, name } = req.body;
+    const { targetUrl, name } = req.body;
+    const creatorId = req.user.id; // Get creator ID from authenticated user
 
-    if (!targetUrl || !creatorId) {
-      return res.status(400).json({ message: 'Target URL and creator ID are required' });
+    if (!targetUrl) {
+      return res.status(400).json({ message: 'Target URL is required' });
     }
 
     // Generate a unique slug
@@ -49,18 +51,15 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get all links for a creator
-router.get('/', async (req, res) => {
+// Get all links for authenticated creator
+router.get('/', auth, async (req, res) => {
   try {
-    const { creatorId } = req.query;
-
-    if (!creatorId) {
-      return res.status(400).json({ message: 'Creator ID is required' });
-    }
+    const creatorId = req.user.id; // Get creator ID from authenticated user
 
     const links = await prisma.link.findMany({
       where: { creatorId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { creator: true } // Include creator details if needed
     });
 
     const linksWithShortUrl = links.map(link => ({
@@ -75,7 +74,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Redirect route (this will be mounted at /l/:slug)
+// Redirect route (public)
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
