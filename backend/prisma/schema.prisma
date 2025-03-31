@@ -9,31 +9,30 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model Link {
-  id        String   @id @default(uuid())
-  slug      String   @unique
-  targetUrl String
-  creatorId String
-  clicks    Int      @default(0)
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  creator   Creator  @relation(fields: [creatorId], references: [id])
-
-  @@index([creatorId])
-  @@index([slug])
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  url         String
+  title       String?
+  description String?
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  creator     Creator  @relation(fields: [creatorId], references: [id])
+  creatorId   String   @db.ObjectId
 }
 
 model Creator {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  links     Link[]
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String    @unique
+  password        String
+  resetToken      String?
+  resetTokenExpiry DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  links           Link[]
 }
