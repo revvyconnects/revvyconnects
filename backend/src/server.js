@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const creatorRoutes = require('./routes/creator');
 const sponsorRoutes = require('./routes/sponsor');
 const trackingRoutes = require('./routes/tracking');
+const linksRoutes = require('./routes/links');
 
 const app = express();
 
@@ -37,6 +38,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/creator', creatorRoutes);
 app.use('/api/sponsor', sponsorRoutes);
 app.use('/api/tracking', trackingRoutes);
+app.use('/api/links', linksRoutes);
+app.use('/l', linksRoutes); // For short link redirects
 
 // Error handling middleware
 app.use((err, req, res, next) => {
