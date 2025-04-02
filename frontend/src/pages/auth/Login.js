@@ -1,119 +1,180 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import {
-  Container,
-  Paper,
+  Box,
+  Card,
+  CardContent,
   TextField,
   Button,
   Typography,
-  Box,
-  ToggleButtonGroup,
-  ToggleButton,
+  Link,
+  Alert,
+  CircularProgress,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { useAuth } from '../../contexts/AuthContext';
 
-console.log("✅ Login component loaded");
-
-function Login() {
+const Login = () => {
   const navigate = useNavigate();
-  const [role, setRole] = useState('creator');
+  const location = useLocation();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
+    password: ''
   });
+  const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submitting login with role:", role);
-    // TODO: Implement actual authentication
-    localStorage.setItem('token', 'dummy-token');
-    localStorage.setItem('userRole', role);
-    const path = `/${role}`;
-    console.log("Navigating to:", path);
-    // Use replace: true to prevent back button from returning to login
-    navigate(path, { replace: true });
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await login(formData.email, formData.password);
+      const from = location.state?.from?.pathname || '/creator';
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Failed to login');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Welcome to Revvy
-          </Typography>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-            <ToggleButtonGroup
-              value={role}
-              exclusive
-              onChange={(e, newRole) => {
-                console.log("Role changed to:", newRole);
-                if (newRole) setRole(newRole);
-              }}
-            >
-              <ToggleButton value="creator">Creator</ToggleButton>
-              <ToggleButton value="sponsor">Sponsor</ToggleButton>
-            </ToggleButtonGroup>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'grey.100',
+        p: 2
+      }}
+    >
+      <Card sx={{ maxWidth: 400, width: '100%', boxShadow: 3 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Box sx={{ mb: 3, textAlign: 'center' }}>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Welcome Back
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Sign in to continue to Revvy
+            </Typography>
           </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
           <form onSubmit={handleSubmit}>
             <TextField
-              margin="normal"
-              required
               fullWidth
-              id="email"
-              label="Email Address"
+              label="Email"
               name="email"
-              autoComplete="email"
-              autoFocus
+              type="email"
               value={formData.email}
               onChange={handleChange}
+              error={!!errors.email}
+              helperText={errors.email}
+              disabled={isLoading}
+              sx={{ mb: 2 }}
             />
+
             <TextField
-              margin="normal"
-              required
               fullWidth
-              name="password"
               label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleChange}
+              error={!!errors.password}
+              helperText={errors.password}
+              disabled={isLoading}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 1 }}
             />
+
+            <Box sx={{ mb: 3, textAlign: 'right' }}>
+              <Link component={RouterLink} to="/forgot-password" variant="body2">
+                Forgot password?
+              </Link>
+            </Box>
+
             <Button
               type="submit"
-              fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-            >
-              Sign In
-            </Button>
-            <Button
               fullWidth
-              variant="text"
-              onClick={() => navigate('/register')}
+              size="large"
+              disabled={isLoading}
+              sx={{ mb: 2 }}
             >
-              Don't have an account? Sign Up
+              {isLoading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                'Sign In'
+              )}
             </Button>
+
+            <Typography variant="body2" align="center">
+              Don't have an account?{' '}
+              <Link component={RouterLink} to="/register">
+                Sign up
+              </Link>
+            </Typography>
           </form>
-        </Paper>
-      </Box>
-    </Container>
+        </CardContent>
+      </Card>
+    </Box>
   );
-}
+};
 
 export default Login;

@@ -1,97 +1,68 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
+const Link = require('../models/Link');
 
-// Generate a random slug
-function generateSlug(length = 6) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-// Create a new link (protected)
+// Create a new link
 router.post('/', auth, async (req, res) => {
   try {
-    const { targetUrl, name } = req.body;
-    const creatorId = req.user.id; // Get creator ID from authenticated user
-
-    if (!targetUrl) {
-      return res.status(400).json({ message: 'Target URL is required' });
+    const { originalUrl, campaignId } = req.body;
+    
+    if (!originalUrl) {
+      return res.status(400).json({ message: 'Original URL is required' });
     }
 
-    // Generate a unique slug
-    let slug = generateSlug();
-    let existingLink = await prisma.link.findUnique({ where: { slug } });
-    while (existingLink) {
-      slug = generateSlug();
-      existingLink = await prisma.link.findUnique({ where: { slug } });
-    }
-
-    const link = await prisma.link.create({
-      data: {
-        slug,
-        targetUrl,
-        creatorId,
-        name: name || null
-      }
+    const link = new Link({
+      originalUrl,
+      campaignId,
+      creatorId: req.user.id,
+      shortCode: Math.random().toString(36).substring(2, 8)
     });
 
-    res.status(201).json({
-      ...link,
-      shortUrl: `${process.env.NODE_ENV === 'production' ? 'https://revvy-api.onrender.com' : 'http://localhost:5000'}/l/${link.slug}`
-    });
+    await link.save();
+    res.status(201).json(link);
   } catch (error) {
     console.error('Error creating link:', error);
     res.status(500).json({ message: 'Error creating link' });
   }
 });
 
-// Get all links for authenticated creator
+// Get all links for a user
 router.get('/', auth, async (req, res) => {
   try {
-    const creatorId = req.user.id; // Get creator ID from authenticated user
-
-    const links = await prisma.link.findMany({
-      where: { creatorId },
-      orderBy: { createdAt: 'desc' },
-      include: { creator: true } // Include creator details if needed
-    });
-
-    const linksWithShortUrl = links.map(link => ({
-      ...link,
-      shortUrl: `${process.env.NODE_ENV === 'production' ? 'https://revvy-api.onrender.com' : 'http://localhost:5000'}/l/${link.slug}`
-    }));
-
-    res.json(linksWithShortUrl);
+    const links = await Link.find({ creatorId: req.user.id });
+    res.json(links);
   } catch (error) {
     console.error('Error fetching links:', error);
     res.status(500).json({ message: 'Error fetching links' });
   }
 });
 
-// Redirect route (public)
-router.get('/:slug', async (req, res) => {
+// Get a specific link
+router.get('/:shortCode', async (req, res) => {
   try {
-    const { slug } = req.params;
-    
-    const link = await prisma.link.update({
-      where: { slug },
-      data: { clicks: { increment: 1 } }
-    });
-
+    const link = await Link.findOne({ shortCode: req.params.shortCode });
     if (!link) {
       return res.status(404).json({ message: 'Link not found' });
     }
+    res.json(link);
+  } catch (error) {
+    console.error('Error fetching link:', error);
+    res.status(500).json({ message: 'Error fetching link' });
+  }
+});
 
-    res.redirect(link.targetUrl);
+// Redirect from short URL to original URL
+router.get('/l/:shortCode', async (req, res) => {
+  try {
+    const link = await Link.findOne({ shortCode: req.params.shortCode });
+    if (!link) {
+      return res.status(404).json({ message: 'Link not found' });
+    }
+    res.redirect(link.originalUrl);
   } catch (error) {
     console.error('Error redirecting:', error);
-    res.status(500).json({ message: 'Error redirecting to target URL' });
+    res.status(500).json({ message: 'Error redirecting' });
   }
 });
 

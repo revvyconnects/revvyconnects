@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
+const User = require('../models/User');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const emailService = require('../services/emailService');
+// const nodemailer = require('nodemailer');
+// const emailService = require('../services/emailService');
 
-// Email configuration
+// Email configuration temporarily disabled
+/*
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
@@ -31,52 +31,53 @@ transporter.verify((error, success) => {
     console.log('Email server is ready to send messages');
   }
 });
+*/
 
 // Register endpoint
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     // Validate input
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !role) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Check if user exists
-    const existingUser = await prisma.creator.findUnique({
-      where: { email }
-    });
+    // Validate role
+    if (!['creator', 'sponsor'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
 
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Create user
-    const creator = await prisma.creator.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword
-      }
+    const user = new User({
+      name,
+      email,
+      password,
+      role
     });
+
+    await user.save();
 
     // Create token
     const token = jwt.sign(
-      { id: creator.id, email: creator.email },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.status(201).json({
       token,
-      creator: {
-        id: creator.id,
-        name: creator.name,
-        email: creator.email
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -96,33 +97,31 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user
-    const creator = await prisma.creator.findUnique({
-      where: { email }
-    });
-
-    if (!creator) {
+    const user = await User.findOne({ email });
+    if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check password
-    const isMatch = await bcrypt.compare(password, creator.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Create token
     const token = jwt.sign(
-      { id: creator.id, email: creator.email },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.json({
       token,
-      creator: {
-        id: creator.id,
-        name: creator.name,
-        email: creator.email
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -134,24 +133,15 @@ router.post('/login', async (req, res) => {
 // Get current user
 router.get('/me', auth, async (req, res) => {
   try {
-    const creator = await prisma.creator.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true
-      }
-    });
-
-    if (!creator) {
-      return res.status(404).json({ message: 'Creator not found' });
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json(creator);
+    res.json(user);
   } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({ message: 'Error fetching user data' });
+    console.error('Get user error:', error);
+    res.status(500).json({ message: 'Error getting user data' });
   }
 });
 
@@ -165,30 +155,21 @@ router.post('/change-password', auth, async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Get user with password
-    const creator = await prisma.creator.findUnique({
-      where: { id: req.user.id }
-    });
-
-    if (!creator) {
-      return res.status(404).json({ message: 'Creator not found' });
+    // Get user
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, creator.password);
+    const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({ message: 'Current password is incorrect' });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
     // Update password
-    await prisma.creator.update({
-      where: { id: req.user.id },
-      data: { password: hashedPassword }
-    });
+    user.password = newPassword;
+    await user.save();
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
